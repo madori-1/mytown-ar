@@ -98,17 +98,54 @@
       max-height: 42vh;
     }
 
+    #ar-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none; /* カメラOFF時は非表示 */
+      z-index: 0;
+    }
+
     #ar-canvas {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       display: block;
       background: linear-gradient(180deg, #1a2a4a 0%, #2d4a2d 80%, #3a5a3a 100%);
+      z-index: 0;
     }
+
+    .ar-camera-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 20;
+      background: rgba(0,0,0,0.55);
+      color: white;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-radius: 99px;
+      padding: 7px 14px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: all 0.2s;
+    }
+    .ar-camera-btn.active {
+      background: rgba(255,112,67,0.8);
+      border-color: rgba(255,255,255,0.6);
+    }
+    .ar-camera-btn:hover { transform: scale(1.05); }
 
     .ar-overlay {
       position: absolute;
       inset: 0;
       pointer-events: none;
+      z-index: 10;
     }
 
     /* Grid animation */
@@ -158,6 +195,8 @@
     .ar-placed-objects {
       position: absolute;
       inset: 0;
+      z-index: 15;
+      pointer-events: all;
     }
 
     .ar-object {
@@ -872,18 +911,26 @@
 
   <!-- AR VIEWPORT -->
   <div class="ar-container" id="ar-container">
+    <!-- カメラ映像背景 -->
+    <video id="ar-video" autoplay playsinline muted></video>
+    <!-- カメラOFF時の背景 -->
     <canvas id="ar-canvas"></canvas>
 
     <div class="ar-overlay">
-      <div class="ar-grid"></div>
+      <div class="ar-grid" id="ar-grid"></div>
       <div class="ar-scan-line"></div>
       <div class="ar-corner tl"></div>
       <div class="ar-corner tr"></div>
       <div class="ar-corner bl"></div>
       <div class="ar-corner br"></div>
       <div class="ar-placed-objects" id="placed-objects"></div>
-      <div class="ar-status" id="ar-status">📍 オブジェクトを選んでタップで配置</div>
+      <div class="ar-status" id="ar-status">📷 カメラをONにしよう</div>
     </div>
+
+    <!-- カメラONボタン -->
+    <button class="ar-camera-btn" id="ar-camera-btn" onclick="toggleARCamera()">
+      📷 カメラON
+    </button>
   </div>
 
   <!-- OBJECT COUNT -->
@@ -1029,11 +1076,11 @@
     <div class="step-list">
       <div class="step">
         <div class="step-num">1</div>
-        <span>テーマをえらぼう（まち・しぜん・うちゅう）</span>
+        <span>「カメラON」ボタンをおしてカメラをひらこう</span>
       </div>
       <div class="step">
         <div class="step-num">2</div>
-        <span>おきたいものをタップしてえらぼう</span>
+        <span>テーマをえらんでおきたいものをタップ</span>
       </div>
       <div class="step">
         <div class="step-num">3</div>
@@ -1268,8 +1315,8 @@
   // ========================================
 
   // --- Supabase設定（本番時はここを書き換える）---
-  const SUPABASE_URL = 'https://jlqnqfhzihqdapfabshj.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_XyMGlSyykqzdcK2NOcvJZQ_MG86hAd6';
+  const SUPABASE_URL = '';       // 例: 'https://xxxx.supabase.co'
+  const SUPABASE_ANON_KEY = '';  // 例: 'eyJhbGci...'
   const USE_DEMO_MODE = !SUPABASE_URL || !SUPABASE_ANON_KEY;
 
   // デモ用インメモリストレージ
@@ -1523,6 +1570,73 @@ const SUPABASE_ANON_KEY = 'sb_publishable_XyMGlSyykqzdcK2NOcvJZQ_MG86hAd6';
     btn.classList.toggle('liked', isLiked);
     btn.style.transform = 'scale(1.4)';
     setTimeout(() => btn.style.transform = '', 200);
+  }
+
+  // ========================================
+  // AR CAMERA
+  // ========================================
+  let arCameraStream = null;
+  let arCameraOn = false;
+
+  async function toggleARCamera() {
+    if (arCameraOn) {
+      stopARCamera();
+    } else {
+      await startARCamera();
+    }
+  }
+
+  async function startARCamera() {
+    try {
+      arCameraStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment', // 背面カメラ優先
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      const video = document.getElementById('ar-video');
+      video.srcObject = arCameraStream;
+      video.style.display = 'block';
+
+      // カメラON時は背景canvasを非表示
+      document.getElementById('ar-canvas').style.display = 'none';
+      // グリッドを薄くする
+      document.getElementById('ar-grid').style.opacity = '0.25';
+
+      arCameraOn = true;
+      const btn = document.getElementById('ar-camera-btn');
+      btn.textContent = '📷 カメラOFF';
+      btn.classList.add('active');
+      updateStatus('📍 オブジェクトを選んでタップで配置');
+      showToast('📷 カメラがONになったよ！');
+    } catch (err) {
+      if (err.name === 'NotAllowedError') {
+        showToast('カメラの許可が必要だよ。ブラウザの設定を確認してね');
+      } else {
+        showToast('カメラをひらけなかったよ…');
+      }
+    }
+  }
+
+  function stopARCamera() {
+    if (arCameraStream) {
+      arCameraStream.getTracks().forEach(t => t.stop());
+      arCameraStream = null;
+    }
+    const video = document.getElementById('ar-video');
+    video.srcObject = null;
+    video.style.display = 'none';
+
+    document.getElementById('ar-canvas').style.display = 'block';
+    document.getElementById('ar-grid').style.opacity = '';
+
+    arCameraOn = false;
+    const btn = document.getElementById('ar-camera-btn');
+    btn.textContent = '📷 カメラON';
+    btn.classList.remove('active');
+    updateStatus('📷 カメラをONにしよう');
+    showToast('カメラをOFFにしたよ');
   }
 
   // ========================================
