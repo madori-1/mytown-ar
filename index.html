@@ -1314,9 +1314,13 @@
   // PHASE 3 - GALLERY
   // ========================================
 
-  // --- Supabase設定（本番時はここを書き換える）---
-  const SUPABASE_URL = '';       // 例: 'https://xxxx.supabase.co'
-  const SUPABASE_ANON_KEY = '';  // 例: 'eyJhbGci...'
+  // =====================================================
+  // 🔧 Supabase設定
+  // supabase.com → Settings → API から取得してここに貼る
+  // 両方入力すると自動で本番モードになります
+  // =====================================================
+  const SUPABASE_URL = 'https://jlqnqfhzihqdapfabshj.supabase.co';       // 例: 'https://xxxx.supabase.co'
+  const SUPABASE_ANON_KEY = 'sb_publishable_XyMGlSyykqzdcK2NOcvJZQ_MG86hAd6';  // 例: 'eyJhbGci...'
   const USE_DEMO_MODE = !SUPABASE_URL || !SUPABASE_ANON_KEY;
 
   // デモ用インメモリストレージ
@@ -1388,6 +1392,12 @@
     document.getElementById('submit-preview-img').src = dataUrl;
     document.getElementById('submit-modal').dataset.dataUrl = dataUrl;
     document.getElementById('submit-modal').classList.add('open');
+
+    // localStorage から前回の名前を自動入力
+    const savedName = localStorage.getItem('mytown_author_name');
+    if (savedName) {
+      document.getElementById('author-name-input').value = savedName;
+    }
     document.getElementById('author-name-input').focus();
   }
 
@@ -1404,6 +1414,9 @@
       return;
     }
 
+    // 名前をlocalStorageに保存（次回自動入力のため）
+    localStorage.setItem('mytown_author_name', name);
+
     const dataUrl = document.getElementById('submit-modal').dataset.dataUrl;
     const btn = document.getElementById('submit-btn');
     btn.textContent = '⏳ とうこうちゅう…';
@@ -1417,7 +1430,6 @@
       }
       closeSubmitModal();
       showToast(`🎉 ${name}さんのさくひんをとうこうしたよ！`);
-      document.getElementById('author-name-input').value = '';
     } catch (e) {
       showToast('とうこうできなかった…もういちどためしてね');
     } finally {
